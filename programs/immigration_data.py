@@ -4,7 +4,7 @@ User must set path = 'Users/jabran/insight/project/data/subset/'
 to appropriate path on their machine. All data was extracted from
 GIS sources using a vector overlay. 
 Needs pandas version 0.25.1
-Warning: Do not set nyears_lookback to anything other than 3 unless
+Warning: Do not set nyears_lookback to anything other than 1 or 3 unless
 you modify the code appropriately. 
 """
 
@@ -26,7 +26,7 @@ warnings.filterwarnings("ignore")
 class immigration_data:
 
     def __init__(self, standardize = True, path = '/Users/jabran/insight/project/data/subset/',
-                 nyears_lookback = 3, year_min = 2001
+                 nyears_lookback = 1, year_min = 2001, classify = True,
                 ):
 
         self.standardize = standardize
@@ -35,6 +35,7 @@ class immigration_data:
         self.read_admin_boundaries()
         self.nyears_lookback = nyears_lookback
         self.year_min = year_min
+        self.classify = classify
 
         
     def get_id(self):
@@ -643,19 +644,20 @@ class immigration_data:
         food = self.read_hybrid_food()
         nroads = self.get_nroads()
         country = self.country
-        country_label_encoder = LabelEncoder()
-        country_integer_encoded = country_label_encoder.fit_transform(country)
-        country_onehot_encoder = OneHotEncoder(sparse=False, categories='auto')
-        country_integer_encoded = country_integer_encoded.reshape(len(country_integer_encoded), 1)
-        country_onehot_encoded = country_onehot_encoder.fit_transform(country_integer_encoded)
-
-        feature_vec_time_ind = np.hstack(   [country_onehot_encoded,
+#        country_label_encoder = LabelEncoder()
+#        country_integer_encoded = country_label_encoder.fit_transform(country)
+#        country_onehot_encoder = OneHotEncoder(sparse=False, categories='auto')
+#        country_integer_encoded = country_integer_encoded.reshape(len(country_integer_encoded), 1)
+#        country_onehot_encoded = country_onehot_encoder.fit_transform(country_integer_encoded)
+        country_numeric = np.zeros(len(country))
+        country_numeric[country == 'Guatemala'] = 1
+        country_numeric[country == 'Honduras'] = 2
+        feature_vec_time_ind = np.hstack(   [np.expand_dims(country_numeric, 1),
                                              np.expand_dims(nrisk, 1),
                                              np.expand_dims(food, 1),
                                              np.expand_dims(nroads, 1)]   )
 
         nyears = self.nyears_lookback
-        if nyears != 3: print('Warning: This requires edit to the immigration data. Do not use out-of-box.')
         year_pred = []
         pop_last_year = []
         label = []
@@ -677,7 +679,7 @@ class immigration_data:
             gov_vec4 = self.gov_arms_hdi_feature_vector(gov4, yt)
             gov_vec5 = self.gov_arms_hdi_feature_vector(gov5, yt)
             gov_vec6 = self.gov_arms_hdi_feature_vector(gov6, yt)
-            gov_vec = np.hstack([gov_vec1, gov_vec2, gov_vec3, gov_vec4, gov_vec4, gov_vec5, gov_vec6])
+            gov_vec = np.hstack([gov_vec1, gov_vec2, gov_vec3, gov_vec4, gov_vec5, gov_vec6])
             #construct arms vector
             arms_vec = self.gov_arms_hdi_feature_vector(arms, yt)
             #construct hdi vector
@@ -721,7 +723,7 @@ class immigration_data:
         dplabel = np.log10(np.asarray(dplabel).ravel())
         pop_last_year = np.log10(np.asarray(pop_last_year).ravel())
         
-        fin_ind = np.isfinite(label) & np.isfinite(dplabel) & np.isfinite(pop_last_year) & (year_pred > 2004) #2000 and 2001 pop data messed up
+        fin_ind = np.isfinite(label) & np.isfinite(dplabel) & np.isfinite(pop_last_year) & (year_pred > 2001 + nyears) #2000 and 2001 pop data messed up
         label = label[fin_ind]
         dplabel = dplabel[fin_ind]
         features = features[fin_ind,:]
@@ -748,41 +750,55 @@ class immigration_data:
         self.pop_last_year = pop_last_year
         self.pop_this_year = label
 
-        #this is a quick and dirty cleaning of feature data which is only useful for 
-        #the current setup. If, for example, nyears is changed, this cleanup step
-        #will need to be revisited.
+        if nyears == 1:
+            definition = np.asarray(['Country', 'N Groups at Risk', 'Food', 'N Roads', 
+                                     np.repeat('Rain', 12), np.repeat('Temperature', 12), 
+                                     np.repeat('BioClim', 17), np.repeat('Government Vector', 6), 
+                                     np.repeat('Arms', 1), np.repeat('HDI', 1), np.repeat('GDP', 1), 
+                                     np.repeat('Population', 1), np.repeat('Relative change in Population', 1), 
+                                    'lat', 'lon', 'id'])
+            definition = np.hstack(definition)            
+        elif nyears == 3:
+            #this is a quick and dirty cleaning of feature data which is only useful for 
+            #the current setup. If, for example, nyears is changed, this cleanup step
+            #will need to be revisited. For outliers, I take the median.
         
-        features[features[:,87] < 0, 87] = np.median(features[features[:,87] > 0, 87])
-        features[features[:,88] < 0, 88] = np.median(features[features[:,88] > 0, 88])
-        features[features[:,89] < 0, 89] = np.median(features[features[:,89] > 0, 89])
-        features[features[:,91] < 0, 91] = np.median(features[features[:,91] > 0, 91])
-        features[features[:,92] < 0, 92] = np.median(features[features[:,92] > 0, 92])
-        features[features[:,93] < 0, 93] = np.median(features[features[:,93] > 0, 93])
-        features[features[:,94] < 0, 94] = np.median(features[features[:,94] > 0, 94])
-        features[features[:,104] < 0, 104] = np.median(features[features[:,104] > 0, 104])
-        features[features[:,105] < 0, 105] = np.median(features[features[:,105] > 0, 105])
-        features[features[:,106] < 0, 106] = np.median(features[features[:,106] > 0, 106])
-        features[features[:,108] < 0, 108] = np.median(features[features[:,108] > 0, 108])
-        features[features[:,109] < 0, 109] = np.median(features[features[:,109] > 0, 109])
-        features[features[:,110] < 0, 110] = np.median(features[features[:,110] > 0, 110])
-        features[features[:,111] < 0, 111] = np.median(features[features[:,111] > 0, 111])
-        features[features[:,121] < 0, 121] = np.median(features[features[:,121] > 0, 121])
-        features[features[:,122] < 0, 122] = np.median(features[features[:,122] > 0, 122])
-        features[features[:,123] < 0, 123] = np.median(features[features[:,123] > 0, 123])
-        features[features[:,125] < 0, 125] = np.median(features[features[:,125] > 0, 125])
-        features[features[:,126] < 0, 126] = np.median(features[features[:,126] > 0, 126])
-        features[features[:,127] < 0, 127] = np.median(features[features[:,127] > 0, 127])
-        features[features[:,128] < 0, 128] = np.median(features[features[:,128] > 0, 128])
+            features[features[:,87] < 0, 87] = np.median(features[features[:,87] > 0, 87])
+            features[features[:,88] < 0, 88] = np.median(features[features[:,88] > 0, 88])
+            features[features[:,89] < 0, 89] = np.median(features[features[:,89] > 0, 89])
+            features[features[:,91] < 0, 91] = np.median(features[features[:,91] > 0, 91])
+            features[features[:,92] < 0, 92] = np.median(features[features[:,92] > 0, 92])
+            features[features[:,93] < 0, 93] = np.median(features[features[:,93] > 0, 93])
+            features[features[:,94] < 0, 94] = np.median(features[features[:,94] > 0, 94])
+            features[features[:,104] < 0, 104] = np.median(features[features[:,104] > 0, 104])
+            features[features[:,105] < 0, 105] = np.median(features[features[:,105] > 0, 105])
+            features[features[:,106] < 0, 106] = np.median(features[features[:,106] > 0, 106])
+            features[features[:,108] < 0, 108] = np.median(features[features[:,108] > 0, 108])
+            features[features[:,109] < 0, 109] = np.median(features[features[:,109] > 0, 109])
+            features[features[:,110] < 0, 110] = np.median(features[features[:,110] > 0, 110])
+            features[features[:,111] < 0, 111] = np.median(features[features[:,111] > 0, 111])
+            features[features[:,121] < 0, 121] = np.median(features[features[:,121] > 0, 121])
+            features[features[:,122] < 0, 122] = np.median(features[features[:,122] > 0, 122])
+            features[features[:,123] < 0, 123] = np.median(features[features[:,123] > 0, 123])
+            features[features[:,125] < 0, 125] = np.median(features[features[:,125] > 0, 125])
+            features[features[:,126] < 0, 126] = np.median(features[features[:,126] > 0, 126])
+            features[features[:,127] < 0, 127] = np.median(features[features[:,127] > 0, 127])
+            features[features[:,128] < 0, 128] = np.median(features[features[:,128] > 0, 128])
         
-        #this definition only applies to the current use of nyears = 3
-        definition = np.asarray([np.repeat('Country',3), 'N Groups at Risk', 'Food', 'N Roads', 
-                                 np.repeat('Rain', 36), np.repeat('Temperature', 36), 
-                                 np.repeat('BioClim', 51), np.repeat('Government Vector', 21), 
-                                 np.repeat('Arms', 3), np.repeat('HDI', 3), np.repeat('GDP', 3), 
-                                 np.repeat('Population', 3), np.repeat('Relative change in Population', 3), 
-                                'lat', 'lon', 'id'])
-        definition = np.hstack(definition)
+            #this definition only applies to the current use of nyears = 3
+            definition = np.asarray(['Country', 'N Groups at Risk', 'Food', 'N Roads', 
+                                     np.repeat('Rain', 36), np.repeat('Temperature', 36), 
+                                     np.repeat('BioClim', 51), np.repeat('Government Vector', 21), 
+                                     np.repeat('Arms', 3), np.repeat('HDI', 3), np.repeat('GDP', 3), 
+                                     np.repeat('Population', 3), np.repeat('Relative change in Population', 3), 
+                                    'lat', 'lon', 'id'])
+            definition = np.hstack(definition)
+        else: definition = -1
         
         #output the features, the target labels to be fit and a crude definition of target labels.
+        
+        if self.classify:
+            dplabel[dplabel<0] = 0
+            dplabel[dplabel>0] = 1
         
         return features, dplabel, definition
