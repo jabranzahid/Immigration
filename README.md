@@ -1,0 +1,8 @@
+# Immigration
+
+This project was carried out in collaboration with Peace Rising, a non-profit organization seeking to provide quantitative insights connecting climate change and migrations. I wrote up a blog post describing the project: https://medium.com/@jabran.zahid/climate-change-induced-immigration-in-central-america-21d00fdd5f45. Please check it out and shoot me an email if you have any questions.
+
+Here I briefly describe the contents of the repository and some brief comments of my modeling choices. The repo has a data folder which includes all the data used in the project. This data was preprocessed and extracted using QGIS from raster and vector data. Details of the extraction procedure are provided in the blog post linked above. The preprocessing and extraction of these data was a significant effort. I have made the data available for posterity as they provide any excellent starting point for alternative models or for further developing the model I built. 
+
+In the programs folder I provide two main level routines: immigration_data.py and get_best_xgb_model.py. The first program generates the feature and label data which are inputs to the model. The code is partially commented and not production level. However, the default setup is fully functioning. The second code outputs the hyper parameter tuned XGBoost classification model. Additionally, there are two Jupyter Notebook files. xgboost_optimize.ipynb shows the steps for hyper parameter tuning and validation of the model. This may be used to optimize and train new models in the future. The second notebook plots.ipynb generates the plots in the blog post. It also serves as an example for how to manipulate the data and model. 
+
